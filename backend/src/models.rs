@@ -1,8 +1,8 @@
 use crate::schema::*;
-use diesel::{Insertable, Queryable};
+use diesel::{Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Selectable, Serialize, Deserialize)]
 pub struct User {
     pub id: i32,
     pub name: String,
