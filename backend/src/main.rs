@@ -1,11 +1,17 @@
 // dependencies
-use actix_web::{web::Data, App, HttpServer};
+use actix_web::{dev::ServiceRequest, web::Data, App, Error, HttpServer};
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
+
 use tracing::{event, instrument, Level};
 use tracing_subscriber::EnvFilter;
 
+use actix_web_httpauth::extractors::bearer::{BearerAuth, Config};
+use actix_web_httpauth::extractors::AuthenticationError;
+use actix_web_httpauth::middleware::HttpAuthentication;
+
 // module declaration
+mod auth;
 mod errors;
 mod handlers;
 mod models;
@@ -13,6 +19,30 @@ mod schema;
 
 // globals (?)
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+
+#[instrument]
+async fn validator(
+    req: ServiceRequest,
+    credentials: BearerAuth,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let config = req
+        .app_data::<Config>()
+        .map(|data| data.as_ref().clone())
+        .unwrap_or_else(Default::default);
+    match auth::validate_token(credentials.token()).await {
+        Ok(res) => {
+            if res == true {
+                Ok(req)
+            } else {
+                Err((AuthenticationError::new(config).into(), req))
+            }
+        }
+        Err(why) => {
+            event!(Level::ERROR, "Error validating token: {}", why);
+            Err((AuthenticationError::new(config).into(), req))
+        }
+    }
+}
 
 #[tokio::main]
 #[instrument]
@@ -35,7 +65,9 @@ async fn main() -> anyhow::Result<()> {
     event!(Level::DEBUG, "Connected to database!");
 
     Ok(HttpServer::new(move || {
+        let auth = HttpAuthentication::bearer(validator);
         App::new()
+            .wrap(auth)
             .app_data(Data::new(pool.clone()))
             .service(handlers::get_users)
             .service(handlers::get_user_by_id)

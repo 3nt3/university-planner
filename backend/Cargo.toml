@@ -19,7 +19,7 @@ futures = "0.3.28"
 log = "0.4.20"
 oauth2 = "4.4.1"
 r2d2 = "0.8.10"
-reqwest = "0.11.18"
+reqwest = { version = "0.11.18", features = ["json"] }
 serde = { version = "1.0.183", features = ["derive"] }
 serde_json = "1.0.105"
 tokio = { version = "1.32.0", features = ["full"] }
