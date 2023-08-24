@@ -93,6 +93,24 @@ fn db_add_user(pool: web::Data<Pool>, new_user: InputUser) -> Result<User, diese
 
 #[instrument]
 #[delete("/users/{id}")]
-pub async fn delete_user() -> impl Responder {
-    format!("hello from delete user")
+pub async fn delete_user(
+    db: web::Data<Pool>,
+    user_id: web::Path<i32>,
+) -> Result<HttpResponse, ServiceError> {
+    let user_id = user_id.into_inner();
+
+    match web::block(move || db_delete_user(db, user_id)).await {
+        Ok(Ok(_)) => Ok(HttpResponse::NoContent().finish()),
+        Ok(Err(diesel::result::Error::NotFound)) => Err(ServiceError::NotFound),
+        deleted_user => {
+            event!(Level::ERROR, "error deleting user: {:?}", deleted_user);
+            Err(ServiceError::InternalServerError)
+        }
+    }
+}
+
+fn db_delete_user(pool: web::Data<Pool>, user_id: i32) -> Result<(), diesel::result::Error> {
+    let mut conn = pool.get().unwrap();
+    diesel::delete(users.find(user_id)).execute(&mut conn)?;
+    Ok(())
 }
