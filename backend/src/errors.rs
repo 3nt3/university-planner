@@ -11,18 +11,24 @@ pub enum ServiceError {
 
     #[display(fmt = "JWKS Fetch Error")]
     JWKSFetchError,
+
+    #[display(fmt = "Not Found")]
+    NotFound,
 }
 
 impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         match *self {
             ServiceError::InternalServerError => {
-                HttpResponse::InternalServerError().json("Internal Server Error, Please try later")
+                HttpResponse::InternalServerError().body("Internal Server Error, Please try later")
             }
-            ServiceError::BadRequest(ref message) => HttpResponse::BadRequest().json(message),
+            ServiceError::BadRequest(ref message) => {
+                HttpResponse::BadRequest().body(message.clone())
+            }
             ServiceError::JWKSFetchError => {
-                HttpResponse::InternalServerError().json("Could not fetch JWKS")
+                HttpResponse::InternalServerError().body("Could not fetch JWKS")
             }
+            ServiceError::NotFound => HttpResponse::NotFound().body("Not Found"),
         }
     }
 }
